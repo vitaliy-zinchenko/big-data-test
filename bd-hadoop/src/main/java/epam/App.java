@@ -1,15 +1,6 @@
 package epam;
 
-import com.google.gson.internal.Streams;
-
-import com.mongodb.BasicDBObjectBuilder;
-import com.mongodb.DB;
-import com.mongodb.DBCollection;
-import com.mongodb.DBObject;
-import com.mongodb.MongoClient;
-import org.apache.commons.io.output.WriterOutputStream;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
@@ -20,19 +11,14 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.io.Reader;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
-import java.util.Comparator;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.TreeMap;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Hello world!
@@ -56,11 +42,13 @@ public class App {
             BASE_FOLDER + "/bid.20130610.txt",
             BASE_FOLDER + "/bid.20130611.txt",
             BASE_FOLDER + "/bid.20130612.txt"
+//            BASE_FOLDER + "/file1.txt",
+//            BASE_FOLDER + "/file2.txt"
     );
 
-    private FileSystem fileSystem;
+    private static final String RESULT_FILE = "/bid_result7.txt";
 
-    private DBCollection collection;
+    private FileSystem fileSystem;
 
     private Map<String, Integer> localDb;
 
@@ -75,32 +63,38 @@ public class App {
         URI hdfsUrl = new URI(URL);
         fileSystem = FileSystem.get(hdfsUrl, conf);
 
-        MongoClient mongo = new MongoClient( "10.23.15.18" , 27017 );
-        DB db = mongo.getDB("hadoop1");
-        collection = db.getCollection("temp");
-
         localDb = new HashMap<>();
     }
 
     public void run() throws IOException {
         readSource();
-//        writeResult();
+        writeResult();
     }
 
     private void writeResult() throws IOException {
-        Path resultPath = new Path(BASE_FOLDER + "/bid_result2.txt");
-        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(fileSystem.append(resultPath)))) {
-            DBObject sort = BasicDBObjectBuilder.start("count", -1).get();
-            collection.find().sort(sort).forEach(count -> {
-                writeResultToHdfs((String)count.get("key"), (Integer)count.get("count"), writer);
-            });
+        LOG.info("Start writing.");
+        Path resultPath = new Path(BASE_FOLDER + RESULT_FILE);
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(fileSystem.create(resultPath)))) {
+            localDb.entrySet()
+                    .stream()
+                    .sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
+                    .forEach(entry -> {
+                        writeResultToHdfs(entry.getKey(), entry.getValue(), writer);
+                    });
+//            DBObject sort = BasicDBObjectBuilder.start("count", -1).get();
+//            collection.find().sort(sort).forEach(count -> {
+//                writeResultToHdfs((String)count.get("key"), (Integer)count.get("count"), writer);
+//            });
         }
+        LOG.info("Finished writing.");
     }
 
     private void readSource() {
+        LOG.info("Start reading.");
         FILE_PATHES.stream()
                 .map(Path::new)
                 .forEach(this::processFile);
+        LOG.info("Finished reading.");
     }
 
     private void processFile(Path filePath) {
@@ -108,8 +102,7 @@ public class App {
             boolean fileExists = fileSystem.exists(filePath);
             if(fileExists) {
                 LOG.info("File {} exists", filePath);
-                FSDataInputStream inputStream = fileSystem.open(filePath);
-                try ( BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream)) ) {
+                try ( BufferedReader reader = new BufferedReader(new InputStreamReader(fileSystem.open(filePath))) ) {
                     reader.lines()
                             .map(this::extractIPinyouId)
                             .filter(Optional::isPresent)
@@ -119,8 +112,7 @@ public class App {
             } else {
                 LOG.info("File {} doesn't exists", filePath);
             }
-            LOG.info("File {} processed. Lines {}, ids {}", filePath, lines, ids);
-            lines = ids = 0L;
+            LOG.info("File {} processed. Total lines {} and ids {}", filePath, lines, ids);
         } catch (IOException e) {
             LOG.error("!!!", e);
         }
@@ -128,6 +120,9 @@ public class App {
 
     private Optional<String> extractIPinyouId(String line) {
         lines++;
+        if(lines % 1_000_000 == 0) {
+            LOG.info("processed {} lines and {} ids", lines, ids);
+        }
         String[] lineItems = line.split("\t");
         String iPinyouId = lineItems[I_PINYOU_ID_POSITION];
         return "null".equals(iPinyouId) ? Optional.empty() : Optional.of(iPinyouId);
@@ -136,8 +131,7 @@ public class App {
     private void createOrUpdate(String iPinyouId) {
         Integer count = localDb.get(iPinyouId);
         if(count != null) {
-            localDb.put(iPinyouId, count++);
-            return;
+            localDb.put(iPinyouId, ++count);
         } else {
             localDb.put(iPinyouId, 1);
             ids++;
@@ -161,7 +155,7 @@ public class App {
         try {
             writer.write(iPinyouId + "\t" + count);
             writer.newLine();
-            LOG.info("Wrote to HDFS: IPinyouId={} count={}", iPinyouId, count);
+            LOG.debug("Wrote to HDFS: IPinyouId={} count={}", iPinyouId, count);
         } catch (IOException e) {
             e.printStackTrace();
         }
