@@ -28,7 +28,7 @@ public class App {
 
     private static final Logger LOG = LoggerFactory.getLogger(App.class);
 
-    private static final String URL = "hdfs://10.23.14.37:8020"; //host is specified in 'hosts' file. specified host refers to 127.0.0.1
+    private static final String URL = "hdfs://10.23.15.105:8020"; //host is specified in 'hosts' file. specified host refers to 127.0.0.1
 
     private static final int I_PINYOU_ID_POSITION = 2;
 
@@ -69,24 +69,6 @@ public class App {
     public void run() throws IOException {
         readSource();
         writeResult();
-    }
-
-    private void writeResult() throws IOException {
-        LOG.info("Start writing.");
-        Path resultPath = new Path(BASE_FOLDER + RESULT_FILE);
-        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(fileSystem.create(resultPath)))) {
-            localDb.entrySet()
-                    .stream()
-                    .sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
-                    .forEach(entry -> {
-                        writeResultToHdfs(entry.getKey(), entry.getValue(), writer);
-                    });
-//            DBObject sort = BasicDBObjectBuilder.start("count", -1).get();
-//            collection.find().sort(sort).forEach(count -> {
-//                writeResultToHdfs((String)count.get("key"), (Integer)count.get("count"), writer);
-//            });
-        }
-        LOG.info("Finished writing.");
     }
 
     private void readSource() {
@@ -149,6 +131,24 @@ public class App {
 //        DBObject newCount = BasicDBObjectBuilder.start(query.toMap()).add("count", 1).get();
 //        collection.insert(newCount);
 //        LOG.info("Created count for iPinyouId {}", iPinyouId);
+    }
+
+    private void writeResult() throws IOException {
+        LOG.info("Start writing.");
+        Path resultPath = new Path(BASE_FOLDER + RESULT_FILE);
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(fileSystem.create(resultPath)))) {
+            localDb.entrySet()
+                    .stream()
+                    .sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
+                    .forEach(entry -> {
+                        writeResultToHdfs(entry.getKey(), entry.getValue(), writer);
+                    });
+//            DBObject sort = BasicDBObjectBuilder.start("count", -1).get();
+//            collection.find().sort(sort).forEach(count -> {
+//                writeResultToHdfs((String)count.get("key"), (Integer)count.get("count"), writer);
+//            });
+        }
+        LOG.info("Finished writing.");
     }
 
     private void writeResultToHdfs(String iPinyouId, Integer count, BufferedWriter writer) {
