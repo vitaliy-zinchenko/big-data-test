@@ -12,13 +12,14 @@ public class WordCount {
 
   public static void main(String[] args) throws Exception {
     Configuration conf = new Configuration();
+//    conf.set("mapred.textoutputformat.separatorText", ",");
     Job job = Job.getInstance(conf, "word count");
     job.setJarByClass(WordCount.class);
     job.setMapperClass(WCMapper.class);
     job.setCombinerClass(WCReducer.class);
     job.setReducerClass(WCReducer.class);
     job.setOutputKeyClass(Text.class);
-    job.setOutputValueClass(IntWritable.class);
+    job.setOutputValueClass(Text.class);
     FileInputFormat.addInputPath(job, new Path(args[0]));
     FileOutputFormat.setOutputPath(job, new Path(args[1]));
     System.exit(job.waitForCompletion(true) ? 0 : 1);
