@@ -3,6 +3,7 @@ package zinjvi.hw4;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
@@ -33,11 +34,14 @@ public class LineNumberDriver extends Configured implements Tool {
         Job job = Job.getInstance(conf, "log map reduce");
         job.setJarByClass(LineNumberDriver.class);
         job.setMapperClass(LineNumberMapper.class);
-        job.setCombinerClass(LongSumReducer.class);
-        job.setReducerClass(LongSumReducer.class);
+//        job.setCombinerClass(LongSumReducer.class);
+        job.setReducerClass(LineNumberReducer.class);
 
-        job.setOutputKeyClass(Text.class);
-        job.setOutputValueClass(LongWritable.class);
+        job.setMapOutputKeyClass(IntWritable.class);
+        job.setMapOutputValueClass(Text.class);
+
+        job.setOutputKeyClass(LongWritable.class);
+        job.setOutputValueClass(Text.class);
 
         System.out.println("job.getNumReduceTasks()=" + job.getNumReduceTasks());
 
