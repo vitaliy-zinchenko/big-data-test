@@ -15,6 +15,11 @@ public class LogData implements Serializable{
         this.number = number;
     }
 
+    @Override
+    public String toString() {
+        return bytes + "," + number;
+    }
+
     public long getBytes() {
         return bytes;
     }

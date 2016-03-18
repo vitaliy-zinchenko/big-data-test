@@ -12,7 +12,8 @@ public class DriverRunner {
 
         Driver driver = new Driver(javaSparkContext);
         String logFile = "/user/root/spark_hw1/access_logs.log";
-        driver.run(logFile);
+        String destPath = "/user/root/spark_hw1/out";
+        driver.run(logFile, destPath);
     }
 
 }

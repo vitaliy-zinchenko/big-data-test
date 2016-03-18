@@ -1,23 +1,38 @@
 package zinjvi;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.spark.SparkConf;
-import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.*;
+import org.junit.rules.TemporaryFolder;
 
-import java.util.Arrays;
-import java.util.List;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 
 public class DriverTest {
+
+    @Rule
+    public TemporaryFolder testFolder = new TemporaryFolder();
+
+    private File out;
+
+    private String inputPath;
+    private String outputFolderPath;
+
     static JavaSparkContext sparkCtx;
 
     @BeforeClass
     public static void sparkSetup() {
-        // Setup Spark
         SparkConf conf = new SparkConf();
         sparkCtx = new JavaSparkContext("local", "test", conf);
+    }
+
+    @Before
+    public void before() throws IOException {
+        out = new File(testFolder.getRoot() + "/out");
+        inputPath = DriverTest.class.getClassLoader().getResource("test_data.txt").getPath();
+        outputFolderPath = "file://" + out;
     }
 
     @AfterClass
@@ -26,23 +41,12 @@ public class DriverTest {
     }
 
     @Test
-    public void integrationTest() {
-        JavaRDD<String> logRawInput = sparkCtx.parallelize(Arrays.asList("data1", "data2", "garbage", "data3"));
-        long count = logRawInput.count();
-        System.out.println(count);
-
-        List<String> result = logRawInput
-                .filter(new TestFilter())
-                .collect();
-
-        System.out.println(result);
-    }
-
-    @Test
-    public void integrationTest2() {
-        String srcPath = "file:///D:\\zinchenko\\BDCC\\training\\big-data-test\\spark1java\\test_data.txt";
-
+    public void integrationTest2() throws IOException {
         Driver driver = new Driver(sparkCtx);
-        driver.run(srcPath);
+        driver.run(inputPath, outputFolderPath);
+
+        String expectedResult = IOUtils.toString(DriverTest.class.getClassLoader().getResourceAsStream("expected.txt"));
+        String actualResult = IOUtils.toString(new FileInputStream(out + "/part-00000"));
+        Assert.assertEquals(expectedResult, actualResult);
     }
 }
